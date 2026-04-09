@@ -7,7 +7,7 @@ type Simulation struct {
 	Time      *int
 	Last_time float64
 
-	E float32
+	E float64
 }
 
 type Object struct {
