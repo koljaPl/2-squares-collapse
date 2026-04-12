@@ -48,6 +48,10 @@ func (s Simulation) GetTopWall() float64 {
 }
 
 type Event struct {
-	Time float64
-	Type string
+	Time    float64
+	Type    string // "wall_x", "wall_y", "object"
+	ObjA    int
+	ObjB    int     // -1 if its a wall collision
+	NormalX float64 // Will be useful for 2D bouncing
+	NormalY float64
 }

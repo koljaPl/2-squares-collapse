@@ -46,26 +46,11 @@ func TimeToObjectCollision(object1, object2 models.Shape) float64 {
 	}
 
 	time := gap / math.Abs(dvx)
-	if time < 0 {
+	if time < EPS {
 		return math.Inf(1)
 	}
 
 	return time
-
-	// This function calculates the time until two objects collide and returns that time.
-	// neededDistance := neededDistance(object1, object2)
-
-	// currentDistance := currentDistance(object1, object2)
-
-	// relativeVelocity := relativeVelocity(object1, object2)
-
-	// if relativeVelocity == 0 {
-	// 	return math.Inf(1) // No collision if relative velocity is zero
-	// }
-
-	// time := (neededDistance - currentDistance) / relativeVelocity
-
-	// return time
 }
 
 func TimeToWall(object models.Shape, wallCoordinates float64) float64 {
@@ -74,11 +59,12 @@ func TimeToWall(object models.Shape, wallCoordinates float64) float64 {
 	base := object.GetBase()
 
 	if base.Vx > 0 && wallCoordinates < base.X {
-		return math.Inf(1) // the wall behind
+		return math.Inf(1)
 	}
 	if base.Vx < 0 && wallCoordinates > base.X {
-		return math.Inf(1) // стена позади
+		return math.Inf(1)
 	}
+
 	distanceToWall := math.Abs(wallCoordinates - base.X)
 
 	if base.Vx == 0 {
@@ -89,7 +75,7 @@ func TimeToWall(object models.Shape, wallCoordinates float64) float64 {
 
 	time := (distanceToWall - side/2) / math.Abs(base.Vx)
 
-	if time < 0 {
+	if time < EPS {
 		return math.Inf(1)
 	}
 
