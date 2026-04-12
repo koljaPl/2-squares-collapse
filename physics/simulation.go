@@ -7,6 +7,8 @@ import (
 	"github.com/koljaPl/2-squares-collapse/physics/models"
 )
 
+const EPS = 1e-9
+
 func advance(objects []models.Shape, deltaTime float64) {
 	for i := range objects {
 		base := objects[i].GetBase()
@@ -65,7 +67,7 @@ func simulateForTime(simulation models.Simulation, objects []models.Shape) {
 		if event == nil {
 			fmt.Printf("It's over guys, no more events to process.\n")
 			fmt.Printf("Current time: %f\n", currTime)
-			fmt.Printf("Objects: %+v\n", &objects)
+			fmt.Printf("Objects: %+v\n", objects)
 			break // No more events to process, exit the loop.
 		}
 

@@ -4,8 +4,6 @@ import (
 	"github.com/koljaPl/2-squares-collapse/physics/models"
 )
 
-const EPS = 1e-9
-
 func Main() {
 	simulationTime := 20.0
 
