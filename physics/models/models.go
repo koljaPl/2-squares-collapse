@@ -4,7 +4,7 @@ type Simulation struct {
 	Width  int
 	Height int
 
-	Time      *int
+	Time      *float64
 	Last_time float64
 
 	E float64
@@ -18,7 +18,7 @@ type Object struct {
 	Vy float64
 
 	Mass    float64
-	Size    float64
+	Size    *float64
 	Density float64
 }
 
@@ -28,7 +28,7 @@ type SimulationInterface interface {
 }
 
 type ObjectInterface interface {
-	// TODO: Define methods for the Object interface if needed.
+	SetupSize()
 }
 
 func (s Simulation) GetHorizontalWall() float64 {
@@ -38,3 +38,11 @@ func (s Simulation) GetHorizontalWall() float64 {
 func (s Simulation) GetVerticalWall() float64 {
 	return float64(s.Height) / 2
 }
+
+// TODO: Get it done
+// func (o *Object) SetupSize() {
+// 	if o.Size == nil {
+// 		side := SideOfCube(o.Mass, o.Density)
+// 		o.Size = &side
+// 	}
+// }

@@ -6,12 +6,14 @@ import (
 
 const EPS = 1e-9
 
-func main() {
+func Main() {
+	simulationTime := 20.0
+
 	simulation := models.Simulation{
 		Width:  800,
 		Height: 600,
 
-		Time:      &[]int{20}[0],
+		Time:      &simulationTime,
 		Last_time: 0,
 
 		E: 1.0,
@@ -21,23 +23,21 @@ func main() {
 		X: 100,
 		Y: 100,
 
-		Vx: 0,
+		Vx: 100,
 		Vy: 0,
 
-		Mass:    1,
-		Size:    50,
+		Mass:    10,
 		Density: 7850.0,
 	}
 
 	square2 := models.Object{
-		X: 300,
-		Y: 300,
+		X: 400,
+		Y: 100,
 
-		Vx: 0,
+		Vx: 40,
 		Vy: 0,
 
-		Mass:    1,
-		Size:    50,
+		Mass:    20,
 		Density: 7850.0,
 	}
 
