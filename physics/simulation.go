@@ -7,14 +7,16 @@ import (
 	"github.com/koljaPl/2-squares-collapse/physics/models"
 )
 
-func advance(objects []models.Object, deltaTime float64) {
+func advance(objects []models.Shape, deltaTime float64) {
 	for i := range objects {
-		objects[i].X += objects[i].Vx * deltaTime
-		objects[i].Y += objects[i].Vy * deltaTime
+		base := objects[i].GetBase()
+
+		base.X += base.Vx * deltaTime
+		base.Y += base.Vy * deltaTime
 	}
 }
 
-func simulateForTime(simulation models.Simulation, objects []models.Object) {
+func simulateForTime(simulation models.Simulation, objects []models.Shape) {
 	currTime := 0.0
 
 	// This function will run the simulation for a specific amount of time, as defined by simulation.Time.
@@ -63,7 +65,7 @@ func simulateForTime(simulation models.Simulation, objects []models.Object) {
 		if event == nil {
 			fmt.Printf("It's over guys, no more events to process.\n")
 			fmt.Printf("Current time: %f\n", currTime)
-			fmt.Printf("Objects: %+v\n", objects)
+			fmt.Printf("Objects: %+v\n", &objects)
 			break // No more events to process, exit the loop.
 		}
 
@@ -75,13 +77,17 @@ func simulateForTime(simulation models.Simulation, objects []models.Object) {
 			Type   string
 			Object int
 		}:
-			ResolveWallCollision(&objects[e.Object], simulation)
+			base := objects[e.Object].GetBase()
+			ResolveWallCollision(base, simulation)
 		case struct {
 			Type    string
 			Object1 int
 			Object2 int
 		}:
-			ResolveObjectCollision(&objects[e.Object1], &objects[e.Object2], simulation)
+			base1 := objects[e.Object1].GetBase()
+			base2 := objects[e.Object2].GetBase()
+
+			ResolveObjectCollision(base1, base2, simulation)
 		}
 
 		fmt.Printf("Current time: %f\n", currTime)
@@ -91,7 +97,7 @@ func simulateForTime(simulation models.Simulation, objects []models.Object) {
 	}
 }
 
-func simulateForever(simulation models.Simulation, objects []models.Object) {
+func simulateForever(simulation models.Simulation, objects []models.Shape) {
 	// TODO: Its not finished, I'll do this later; the idea is to run the simulation forever until the user closes the window or an exit condition is met.
 
 	// This function will run the simulation forever until the user closes the window or an exit condition is met.
@@ -100,8 +106,9 @@ func simulateForever(simulation models.Simulation, objects []models.Object) {
 	// }
 }
 
-func SimulationLoop(simulation models.Simulation, objects []models.Object) {
+func SimulationLoop(simulation models.Simulation, objects []models.Shape) {
 	// This function will run the simulation loop, updating the physics and rendering the results.
+
 	if simulation.Time == nil {
 		// Simulation forever until the user closes the window or an exit condition is met.
 		simulateForever(simulation, objects)

@@ -1,48 +1,37 @@
 package models
 
-type Simulation struct {
-	Width  int
-	Height int
+import "math"
 
-	Time      *float64
-	Last_time float64
-
-	E float64
+type Square struct {
+	BaseObject
+	Size float64
 }
 
-type Object struct {
-	X float64
-	Y float64
-
-	Vx float64
-	Vy float64
-
-	Mass    float64
-	Size    *float64
-	Density float64
+func (s *Square) SetupSize() {
+	s.Size = math.Sqrt(s.Mass / s.Density)
 }
 
-type SimulationInterface interface {
-	GetHorizontalWall() float64
-	GetVerticalWall() float64
+func (s *Square) GetSize() float64 {
+	return s.Size
 }
 
-type ObjectInterface interface {
-	SetupSize()
+func (s *Square) GetBase() *BaseObject {
+	return &s.BaseObject
 }
 
-func (s Simulation) GetHorizontalWall() float64 {
-	return float64(s.Width) / 2
+type Circle struct {
+	BaseObject
+	Radius float64
 }
 
-func (s Simulation) GetVerticalWall() float64 {
-	return float64(s.Height) / 2
+func (c *Circle) SetupSize() {
+	c.Radius = math.Sqrt(c.Mass / (c.Density * math.Pi))
 }
 
-// TODO: Get it done
-// func (o *Object) SetupSize() {
-// 	if o.Size == nil {
-// 		side := SideOfCube(o.Mass, o.Density)
-// 		o.Size = &side
-// 	}
-// }
+func (c *Circle) GetSize() float64 {
+	return c.Radius
+}
+
+func (c *Circle) GetBase() *BaseObject {
+	return &c.BaseObject
+}
