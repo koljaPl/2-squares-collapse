@@ -1,8 +1,10 @@
 package physics
 
 import (
+	"context"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/koljaPl/2-squares-collapse/physics/models"
 )
@@ -99,13 +101,89 @@ func simulateForTime(simulation models.Simulation, objects []models.Shape) {
 	}
 }
 
-func simulateForever(simulation models.Simulation, objects []models.Shape) {
-	// TODO: Its not finished, I'll do this later; the idea is to run the simulation forever until the user closes the window or an exit condition is met.
+func findNextEvent(simulation models.Simulation, objects []models.Shape) (float64, *models.Event) {
+	minTime := math.Inf(1)
+	var nextEvent *models.Event
 
-	// This function will run the simulation forever until the user closes the window or an exit condition is met.
-	// for {
-	// Update physics and render results here.
-	// }
+	walls := []float64{0, float64(simulation.Width)}
+	for i, obj := range objects {
+		for _, wallCoord := range walls {
+			t := TimeToWall(obj, wallCoord)
+			if t < minTime && t > 0 {
+				minTime = t
+				nextEvent = &models.Event{Type: "wall", ObjA: i, ObjB: -1, Time: t}
+			}
+		}
+	}
+
+	for i := 0; i < len(objects); i++ {
+		for j := i + 1; j < len(objects); j++ {
+			t := TimeToObjectCollision(objects[i], objects[j])
+			if t < minTime && t > 0 {
+				minTime = t
+				nextEvent = &models.Event{Type: "object", ObjA: i, ObjB: j, Time: t}
+			}
+		}
+	}
+
+	return minTime, nextEvent
+}
+
+func processEvent(simulation models.Simulation, objects []models.Shape, event *models.Event) {
+	if event == nil {
+		return
+	}
+
+	switch event.Type {
+	case "wall":
+		base := objects[event.ObjA].GetBase()
+		ResolveWallCollision(base, simulation)
+	case "object":
+		baseA := objects[event.ObjA].GetBase()
+		baseB := objects[event.ObjB].GetBase()
+		ResolveObjectCollision(baseA, baseB, simulation)
+	}
+}
+
+func simulateStep(simulation models.Simulation, objects []models.Shape, dt float64) {
+	remainingTime := dt
+
+	for remainingTime > EPS {
+		eventTime, event := findNextEvent(simulation, objects)
+
+		// Если в этом "кадре" событий больше нет
+		if event == nil || eventTime > remainingTime {
+			advance(objects, remainingTime)
+			break
+		}
+
+		// Продвигаем до момента события и обрабатываем его
+		advance(objects, eventTime)
+		processEvent(simulation, objects, event)
+		remainingTime -= eventTime
+	}
+}
+
+func simulateForever(ctx context.Context, simulation models.Simulation, objects []models.Shape, stateChan chan<- []models.Shape) {
+	const fps = 60
+	ticker := time.NewTicker(time.Second / fps)
+	defer ticker.Stop()
+
+	dt := 1.0 / float64(fps)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			simulateStep(simulation, objects, dt)
+
+			// Отправляем состояние для GUI/Web
+			if stateChan != nil {
+				stateChan <- objects
+			}
+		}
+	}
 }
 
 func SimulationLoop(simulation models.Simulation, objects []models.Shape) {
@@ -113,7 +191,7 @@ func SimulationLoop(simulation models.Simulation, objects []models.Shape) {
 
 	if simulation.Time == nil {
 		// Simulation forever until the user closes the window or an exit condition is met.
-		simulateForever(simulation, objects)
+		simulateForever(context.Background(), simulation, objects, nil)
 	} else {
 		// Simulation for a specific amount of time, as defined by simulation.Time.
 		simulateForTime(simulation, objects)
