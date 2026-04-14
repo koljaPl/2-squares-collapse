@@ -54,22 +54,21 @@ func Main() {
 	// -----------------------------------------------------------------------------------------------------
 	// It's important to use a channel for state updates if we want to visualize the simulation in real-time.
 
-	// stateChan := make(chan []models.Shape)
+	// stateChan := make(chan []models.RenderState)
 
 	// // 2. Запускаем симуляцию в горутине
 	// go SimulationLoop(simulation, []models.Shape{square1, square2}, stateChan)
 
 	// // 3. Читаем из канала и печатаем
 	// fmt.Println("Starting simulation... (Press Ctrl+C to stop)")
-	// for objects := range stateChan {
+	// for snapshot := range stateChan {
 	// 	// Очистка экрана (ANSI escape code), чтобы вывод не бежал вниз, а обновлялся на месте
 	// 	fmt.Print("\033[H\033[2J")
 
 	// 	fmt.Printf("--- Current State ---\n")
-	// 	for i, obj := range objects {
-	// 		base := obj.GetBase()
-	// 		fmt.Printf("Object %d: X=%.2f, Y=%.2f | Vx=%.2f, Vy=%.2f\n",
-	// 			i, base.X, base.Y, base.Vx, base.Vy)
+	// 	for _, obj := range snapshot {
+	// 		const format = "Object %3d: X=%8.2f, Y=%8.2f | Vx=%8.2f, Vy=%8.2f | Size=%6.2f, Type=%-10s\n"
+	// 		fmt.Printf(format, obj.ID, obj.X, obj.Y, obj.Vx, obj.Vy, obj.Size, obj.Type)
 	// 	}
 	// }
 }

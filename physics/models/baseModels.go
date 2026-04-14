@@ -55,3 +55,13 @@ type Event struct {
 	NormalX float64 // Will be useful for 2D bouncing
 	NormalY float64
 }
+
+type RenderState struct {
+	ID   int     `json:"id"`
+	X    float64 `json:"x"`
+	Y    float64 `json:"y"`
+	Vx   float64 `json:"vx"`
+	Vy   float64 `json:"vy"`
+	Size float64 `json:"size"`
+	Type string  `json:"type"` // "square" или "circle"
+}

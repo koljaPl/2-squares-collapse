@@ -116,7 +116,7 @@ func simulateStep(simulation models.Simulation, objects []models.Shape, dt float
 	}
 }
 
-func simulateForever(ctx context.Context, simulation models.Simulation, objects []models.Shape, stateChan chan<- []models.Shape) {
+func simulateForever(ctx context.Context, simulation models.Simulation, objects []models.Shape, stateChan chan<- []models.RenderState) {
 	const fps = 60
 	ticker := time.NewTicker(time.Second / fps)
 	defer ticker.Stop()
@@ -130,21 +130,38 @@ func simulateForever(ctx context.Context, simulation models.Simulation, objects 
 		case <-ticker.C:
 			simulateStep(simulation, objects, dt)
 
-			// Отправляем состояние для GUI/Web
+			// 2. Создаем глубокую копию данных (Snapshot)
+			// Это критически важно: мы копируем значения в новую структуру,
+			// которую WebSocket-горутина сможет безопасно читать.
+			snapshot := make([]models.RenderState, len(objects))
+			for i, obj := range objects {
+				base := obj.GetBase()
+				snapshot[i] = models.RenderState{
+					ID:   i,
+					X:    base.X,
+					Y:    base.Y,
+					Vx:   base.Vx,
+					Vy:   base.Vy,
+					Size: obj.GetSize(),
+					// Можно добавить логику определения типа, если нужно для отрисовки
+					Type: "square",
+				}
+			}
+
+			// 3. Отправляем копию в канал
 			if stateChan != nil {
-				// ВАЖНО: Если Web-сервер читает эти данные медленнее, чем 60fps,
-				// канал может заблокироваться. Можно использовать select с default.
 				select {
-				case stateChan <- objects:
+				case stateChan <- snapshot:
 				default:
-					// Пропускаем кадр, если канал переполнен (помогает избежать лагов сервера)
+					// Если канал забит (клиент не успевает читать), просто пропускаем кадр.
+					// Это лучше, чем тормозить всю физику.
 				}
 			}
 		}
 	}
 }
 
-func SimulationLoop(simulation models.Simulation, objects []models.Shape, stateChan chan<- []models.Shape) {
+func SimulationLoop(simulation models.Simulation, objects []models.Shape, stateChan chan<- []models.RenderState) {
 	// This function will run the simulation loop, updating the physics and rendering the results.
 
 	if simulation.Time == nil {
