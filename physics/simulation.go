@@ -22,82 +22,24 @@ func advance(objects []models.Shape, deltaTime float64) {
 
 func simulateForTime(simulation models.Simulation, objects []models.Shape) {
 	currTime := 0.0
+	targetTime := *simulation.Time
 
-	// This function will run the simulation for a specific amount of time, as defined by simulation.Time.
-	for currTime < *simulation.Time {
-		bestTime := *simulation.Time - currTime
-		event := interface{}(nil)
+	for currTime < targetTime {
+		remainingTime := targetTime - currTime
+		eventTime, event := findNextEvent(simulation, objects)
 
-		for key, value := range objects {
-			timeToLeftWall := TimeToWall(value, 0)
-			timeToRightWall := TimeToWall(value, float64(simulation.Width))
-
-			for _, timeToWall := range []float64{timeToLeftWall, timeToRightWall} {
-				if timeToWall != math.Inf(1) && timeToWall < bestTime {
-					bestTime = timeToWall
-					event = struct {
-						Type   string
-						Object int
-					}{
-						Type:   "wall",
-						Object: key,
-					}
-				}
-			}
+		if event == nil || eventTime > remainingTime {
+			advance(objects, remainingTime)
+			currTime += remainingTime
+			fmt.Printf("It's over guys, no more events to process in this timeframe.\n")
+			break
 		}
 
-		if len(objects) > 1 {
-			for i := 0; i < len(objects); i++ {
-				for j := i + 1; j < len(objects); j++ {
-					timeToCollision := TimeToObjectCollision(objects[i], objects[j])
-					if timeToCollision != math.Inf(1) && timeToCollision < bestTime {
-						bestTime = timeToCollision
-						event = struct {
-							Type    string
-							Object1 int
-							Object2 int
-						}{
-							Type:    "object",
-							Object1: i,
-							Object2: j,
-						}
-					}
-				}
-			}
-		}
+		advance(objects, eventTime)
+		processEvent(simulation, objects, event)
+		currTime += eventTime
 
-		if event == nil {
-			fmt.Printf("It's over guys, no more events to process.\n")
-			fmt.Printf("Current time: %f\n", currTime)
-			fmt.Printf("Objects: %+v\n", objects)
-			break // No more events to process, exit the loop.
-		}
-
-		advance(objects, bestTime)
-
-		// TODO: This switch statement is a bit hacky; please refactor it to be more elegant and maintainable.
-		switch e := event.(type) {
-		case struct {
-			Type   string
-			Object int
-		}:
-			base := objects[e.Object].GetBase()
-			ResolveWallCollision(base, simulation)
-		case struct {
-			Type    string
-			Object1 int
-			Object2 int
-		}:
-			base1 := objects[e.Object1].GetBase()
-			base2 := objects[e.Object2].GetBase()
-
-			ResolveObjectCollision(base1, base2, simulation)
-		}
-
-		fmt.Printf("Current time: %f\n", currTime)
-		fmt.Printf("Objects: %+v\n", objects)
-		currTime += bestTime
-
+		fmt.Printf("Event processed at time: %f, Type: %s, ObjA: %d\n", currTime, event.Type, event.ObjA)
 	}
 }
 
@@ -105,13 +47,18 @@ func findNextEvent(simulation models.Simulation, objects []models.Shape) (float6
 	minTime := math.Inf(1)
 	var nextEvent *models.Event
 
-	walls := []float64{0, float64(simulation.Width)}
+	wallsX := []float64{simulation.GetLeftWall(), simulation.GetRightWall()}
 	for i, obj := range objects {
-		for _, wallCoord := range walls {
+		for _, wallCoord := range wallsX {
 			t := TimeToWall(obj, wallCoord)
-			if t < minTime && t > 0 {
+			if t > EPS && t < minTime {
 				minTime = t
-				nextEvent = &models.Event{Type: "wall", ObjA: i, ObjB: -1, Time: t}
+				nextEvent = &models.Event{
+					Type: "wall_x",
+					ObjA: i,
+					ObjB: -1,
+					Time: t,
+				}
 			}
 		}
 	}
@@ -119,9 +66,14 @@ func findNextEvent(simulation models.Simulation, objects []models.Shape) (float6
 	for i := 0; i < len(objects); i++ {
 		for j := i + 1; j < len(objects); j++ {
 			t := TimeToObjectCollision(objects[i], objects[j])
-			if t < minTime && t > 0 {
+			if t > EPS && t < minTime {
 				minTime = t
-				nextEvent = &models.Event{Type: "object", ObjA: i, ObjB: j, Time: t}
+				nextEvent = &models.Event{
+					Type: "object",
+					ObjA: i,
+					ObjB: j,
+					Time: t,
+				}
 			}
 		}
 	}
@@ -135,9 +87,11 @@ func processEvent(simulation models.Simulation, objects []models.Shape, event *m
 	}
 
 	switch event.Type {
-	case "wall":
+	case "wall_x", "wall":
 		base := objects[event.ObjA].GetBase()
 		ResolveWallCollision(base, simulation)
+	case "wall_y":
+		// For future implementation when we will have walls in y direction, we will need to implement this case as well.
 	case "object":
 		baseA := objects[event.ObjA].GetBase()
 		baseB := objects[event.ObjB].GetBase()
@@ -151,13 +105,11 @@ func simulateStep(simulation models.Simulation, objects []models.Shape, dt float
 	for remainingTime > EPS {
 		eventTime, event := findNextEvent(simulation, objects)
 
-		// Если в этом "кадре" событий больше нет
 		if event == nil || eventTime > remainingTime {
 			advance(objects, remainingTime)
 			break
 		}
 
-		// Продвигаем до момента события и обрабатываем его
 		advance(objects, eventTime)
 		processEvent(simulation, objects, event)
 		remainingTime -= eventTime
@@ -180,18 +132,24 @@ func simulateForever(ctx context.Context, simulation models.Simulation, objects 
 
 			// Отправляем состояние для GUI/Web
 			if stateChan != nil {
-				stateChan <- objects
+				// ВАЖНО: Если Web-сервер читает эти данные медленнее, чем 60fps,
+				// канал может заблокироваться. Можно использовать select с default.
+				select {
+				case stateChan <- objects:
+				default:
+					// Пропускаем кадр, если канал переполнен (помогает избежать лагов сервера)
+				}
 			}
 		}
 	}
 }
 
-func SimulationLoop(simulation models.Simulation, objects []models.Shape) {
+func SimulationLoop(simulation models.Simulation, objects []models.Shape, stateChan chan<- []models.Shape) {
 	// This function will run the simulation loop, updating the physics and rendering the results.
 
 	if simulation.Time == nil {
 		// Simulation forever until the user closes the window or an exit condition is met.
-		simulateForever(context.Background(), simulation, objects, nil)
+		simulateForever(context.Background(), simulation, objects, stateChan)
 	} else {
 		// Simulation for a specific amount of time, as defined by simulation.Time.
 		simulateForTime(simulation, objects)
