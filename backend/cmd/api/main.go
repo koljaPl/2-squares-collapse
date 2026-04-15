@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"backend/internal/server"
+	"github.com/koljaPl/2-squares-collapse/backend/internal/server"
 )
 
 func gracefulShutdown(apiServer *http.Server, done chan bool) {
