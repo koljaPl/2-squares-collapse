@@ -161,12 +161,12 @@ func simulateForever(ctx context.Context, simulation models.Simulation, objects 
 	}
 }
 
-func SimulationLoop(simulation models.Simulation, objects []models.Shape, stateChan chan<- []models.RenderState) {
+func SimulationLoop(ctx context.Context, simulation models.Simulation, objects []models.Shape, stateChan chan<- []models.RenderState) {
 	// This function will run the simulation loop, updating the physics and rendering the results.
 
 	if simulation.Time == nil {
 		// Simulation forever until the user closes the window or an exit condition is met.
-		simulateForever(context.Background(), simulation, objects, stateChan)
+		simulateForever(ctx, simulation, objects, stateChan)
 	} else {
 		// Simulation for a specific amount of time, as defined by simulation.Time.
 		simulateForTime(simulation, objects)
