@@ -2,9 +2,11 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/koljaPl/2-squares-collapse/physics"
@@ -14,12 +16,8 @@ import (
 func (s *Server) RegisterRoutes() http.Handler {
 	mux := http.NewServeMux()
 
-	// Роут для WebSocket
 	mux.HandleFunc("/ws", wsHandler)
 
-	// Роут для статики (отдаем index.html)
-	// ВАЖНО: При запуске через "go run ./cmd/api" из корня проекта,
-	// путь "./static" будет искаться относительно папки backend.
 	fileServer := http.FileServer(http.Dir("./static"))
 	mux.Handle("/", fileServer)
 
@@ -34,13 +32,11 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-CSRF-Token")
 		w.Header().Set("Access-Control-Allow-Credentials", "false") // Set to "true" if credentials are required
 
-		// Handle preflight OPTIONS requests
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 
-		// Proceed with the next handler
 		next.ServeHTTP(w, r)
 	})
 }
@@ -48,51 +44,80 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	// Разрешаем подключения с любых доменов (для локальной разработки это ок)
+
 	CheckOrigin: func(r *http.Request) bool {
 		return true
+		// return r.Header.Get("Origin") == "http://localhost:3000"
 	},
 }
 
+type RenderState struct {
+	X1 float64 `json:"x1"`
+	Y1 float64 `json:"y1"`
+	X2 float64 `json:"x2"`
+	Y2 float64 `json:"y2"`
+
+	Vx1 float64 `json:"vx1"`
+	Vy1 float64 `json:"vy1"`
+	Vx2 float64 `json:"vx2"`
+	Vy2 float64 `json:"vy2"`
+
+	Mass1 float64 `json:"mass1"`
+	Mass2 float64 `json:"mass2"`
+}
+
 func wsHandler(w http.ResponseWriter, r *http.Request) {
-	// 1. Апгрейдим соединение до WebSocket
+	var renderState RenderState
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Ошибка при апгрейде соединения:", err)
 		return
 	}
+	conn.SetReadLimit(1024)
+
 	defer conn.Close()
 	fmt.Println("Клиент подключился!")
 
-	// 2. Создаем контекст для отмены симуляции при отключении клиента
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel() // ОЧЕНЬ ВАЖНО: остановит simulateForever, когда функция завершится
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_, msg, err := conn.ReadMessage()
+	if err != nil {
+		log.Println("Ошибка чтения init данных:", err)
+		return
+	}
+	conn.SetReadDeadline(time.Time{}) // сброс
 
-	// 3. Инициализируем начальное состояние симуляции (как у тебя было)
+	err = json.Unmarshal(msg, &renderState)
+	if err != nil {
+		log.Println("Ошибка парсинга JSON:", err)
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	simulation := models.Simulation{
 		Width:  800,
 		Height: 600,
-		Time:   nil, // Бесконечная симуляция
+		Time:   nil,
 		E:      1.0,
 	}
 
 	square1 := &models.Square{
-		BaseObject: models.BaseObject{X: -300, Y: 0, Vx: 100, Vy: 0, Mass: 10, Density: 7850.0},
+		BaseObject: models.BaseObject{X: renderState.X1, Y: renderState.Y1, Vx: renderState.Vx1, Vy: renderState.Vy1, Mass: renderState.Mass1, Density: 7850.0},
 	}
 	square2 := &models.Square{
-		BaseObject: models.BaseObject{X: 0, Y: 0, Vx: 40, Vy: 0, Mass: 20, Density: 7850.0},
+		BaseObject: models.BaseObject{X: renderState.X2, Y: renderState.Y2, Vx: renderState.Vx2, Vy: renderState.Vy2, Mass: renderState.Mass2, Density: 7850.0},
 	}
 	square1.SetupSize()
 	square2.SetupSize()
 	objects := []models.Shape{square1, square2}
 
-	// 4. Создаем канал для получения снимков состояния (Snapshots)
-	stateChan := make(chan []models.RenderState, 1) // Буфер 1, чтобы физика не ждала, если канал полон
+	stateChan := make(chan []models.RenderState, 1)
 
 	go func() {
-		defer cancel() // Как только чтение прервется (клиент ушел), отменяем контекст физики
+		defer cancel()
 		for {
-			// Читаем сообщения. Нам не важно содержимое, мы ждем ошибку (например, закрытие)
 			if _, _, err := conn.ReadMessage(); err != nil {
 				log.Println("Клиент закрыл соединение:", err)
 				break
@@ -100,21 +125,18 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// 5. Запускаем симуляцию в отдельной горутине
 	go physics.SimulationLoop(ctx, simulation, objects, stateChan)
 
-	// 6. Слушаем канал и отправляем данные клиенту
 	for {
 		select {
 		case <-ctx.Done():
-			// Если контекст отменен, выходим
+			log.Println("Контекст завершён, закрываем соединение")
 			return
 		case snapshot := <-stateChan:
-			// Отправляем JSON-массив в WebSocket
 			err := conn.WriteJSON(snapshot)
 			if err != nil {
 				log.Println("Клиент отключился или ошибка записи:", err)
-				return // Выход из цикла (сработает defer cancel() и defer conn.Close())
+				return
 			}
 		}
 	}
