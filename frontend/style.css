@@ -228,6 +228,21 @@ label input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none
 .btn:hover { background: var(--text); color: var(--bg); }
 .btn.primary { background: var(--text); color: var(--bg); }
 .btn.primary:hover { opacity: 0.75; }
+.btn.small { font-size: 0.7rem; padding: 0.35rem 0.9rem; border-color: var(--border); color: var(--muted); }
+.btn.small:hover { border-color: var(--text); color: var(--text); background: none; }
+.btn.small.active { border-color: var(--text); color: var(--text); }
+
+.panel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.angle-label { position: relative; }
+
+.hidden { display: none !important; }
 
 /* Sim status */
 #sim-panel {

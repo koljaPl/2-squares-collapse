@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/koljaPl/2-squares-collapse/backend/additional_physics"
 	"github.com/koljaPl/2-squares-collapse/physics"
 	"github.com/koljaPl/2-squares-collapse/physics/models"
 )
@@ -18,8 +19,8 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	mux.HandleFunc("/ws", wsHandler)
 
-	fileServer := http.FileServer(http.Dir("./static"))
-	mux.Handle("/", fileServer)
+	// fileServer := http.FileServer(http.Dir("./static"))
+	// mux.Handle("/", fileServer)
 
 	return s.corsMiddleware(mux)
 }
@@ -57,10 +58,11 @@ type RenderState struct {
 	X2 float64 `json:"x2"`
 	Y2 float64 `json:"y2"`
 
-	Vx1 float64 `json:"vx1"`
-	Vy1 float64 `json:"vy1"`
-	Vx2 float64 `json:"vx2"`
-	Vy2 float64 `json:"vy2"`
+	Angle1 float64 `json:"angle1"`
+	Angle2 float64 `json:"angle2"`
+
+	RelativeSpeed1 float64 `json:"relative_speed1"`
+	RelativeSpeed2 float64 `json:"relative_speed2"`
 
 	Mass1 float64 `json:"mass1"`
 	Mass2 float64 `json:"mass2"`
@@ -71,25 +73,25 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("Ошибка при апгрейде соединения:", err)
+		log.Println("Error during connection upgrade:", err)
 		return
 	}
 	conn.SetReadLimit(1024)
 
 	defer conn.Close()
-	fmt.Println("Клиент подключился!")
+	fmt.Println("Client connected!")
 
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
-		log.Println("Ошибка чтения init данных:", err)
+		log.Println("Error reading init data:", err)
 		return
 	}
-	conn.SetReadDeadline(time.Time{}) // сброс
+	conn.SetReadDeadline(time.Time{}) // reset read deadline after initial message
 
 	err = json.Unmarshal(msg, &renderState)
 	if err != nil {
-		log.Println("Ошибка парсинга JSON:", err)
+		log.Println("Error parsing JSON:", err)
 		return
 	}
 
@@ -103,11 +105,14 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		E:      1.0,
 	}
 
+	vx1, vy1 := additional_physics.PolarToCartesian(renderState.Angle1, renderState.RelativeSpeed1)
+	vx2, vy2 := additional_physics.PolarToCartesian(renderState.Angle2, renderState.RelativeSpeed2)
+
 	square1 := &models.Square{
-		BaseObject: models.BaseObject{X: renderState.X1, Y: renderState.Y1, Vx: renderState.Vx1, Vy: renderState.Vy1, Mass: renderState.Mass1, Density: 7850.0},
+		BaseObject: models.BaseObject{X: renderState.X1, Y: renderState.Y1, Vx: vx1, Vy: vy1, Mass: renderState.Mass1, Density: 7850.0},
 	}
 	square2 := &models.Square{
-		BaseObject: models.BaseObject{X: renderState.X2, Y: renderState.Y2, Vx: renderState.Vx2, Vy: renderState.Vy2, Mass: renderState.Mass2, Density: 7850.0},
+		BaseObject: models.BaseObject{X: renderState.X2, Y: renderState.Y2, Vx: vx2, Vy: vy2, Mass: renderState.Mass2, Density: 7850.0},
 	}
 	square1.SetupSize()
 	square2.SetupSize()
@@ -119,7 +124,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 		for {
 			if _, _, err := conn.ReadMessage(); err != nil {
-				log.Println("Клиент закрыл соединение:", err)
+				log.Println("Client closed connection:", err)
 				break
 			}
 		}
@@ -130,12 +135,12 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Контекст завершён, закрываем соединение")
+			log.Println("Context completed, closing connection")
 			return
 		case snapshot := <-stateChan:
 			err := conn.WriteJSON(snapshot)
 			if err != nil {
-				log.Println("Клиент отключился или ошибка записи:", err)
+				log.Println("Client disconnected or write error:", err)
 				return
 			}
 		}

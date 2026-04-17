@@ -35,22 +35,56 @@
 
   <!-- Setup panel: shown before simulation starts -->
   <div id="setup-panel" class="panel">
-    <p class="hint" data-i18n="hint">Drag the squares to set starting positions, then configure parameters.</p>
+    <p class="hint" data-i18n="hint">Drag squares to position · hover outside a square to set angle.</p>
     <div class="obj-inputs">
+
       <fieldset class="obj1-field">
         <legend data-i18n="obj1">■ Object 1</legend>
-        <label><span data-i18n="mass">Mass</span> (kg)<input type="number" id="mass1" value="10" min="0.1" max="9999" step="1" inputmode="decimal"></label>
-        <label>Vx (m/s)<input type="number" id="vx1" value="100" step="1" inputmode="decimal"></label>
-        <label>Vy (m/s)<input type="number" id="vy1" value="0" step="1" inputmode="decimal"></label>
+        <label><span data-i18n="mass">Mass</span> (kg)
+          <input type="number" id="mass1" value="10" min="0.1" max="9999" step="1" inputmode="decimal">
+        </label>
+        <!-- Default mode: speed + angle -->
+        <label class="std-only">Speed (m/s)
+          <input type="number" id="speed1" value="100" min="0" step="1" inputmode="decimal">
+        </label>
+        <label class="std-only angle-label" title="Or hover outside the square on canvas">
+          Angle (°)
+          <input type="number" id="angledeg1" value="0" min="-180" max="180" step="1" inputmode="decimal">
+        </label>
+        <!-- Advanced mode: vx + vy -->
+        <label class="adv-only hidden">Vx (m/s)
+          <input type="number" id="vx1" value="100" step="1" inputmode="decimal">
+        </label>
+        <label class="adv-only hidden">Vy (m/s)
+          <input type="number" id="vy1" value="0" step="1" inputmode="decimal">
+        </label>
       </fieldset>
+
       <fieldset class="obj2-field">
         <legend data-i18n="obj2">■ Object 2</legend>
-        <label><span data-i18n="mass">Mass</span> (kg)<input type="number" id="mass2" value="20" min="0.1" max="9999" step="1" inputmode="decimal"></label>
-        <label>Vx (m/s)<input type="number" id="vx2" value="40" step="1" inputmode="decimal"></label>
-        <label>Vy (m/s)<input type="number" id="vy2" value="0" step="1" inputmode="decimal"></label>
+        <label><span data-i18n="mass">Mass</span> (kg)
+          <input type="number" id="mass2" value="20" min="0.1" max="9999" step="1" inputmode="decimal">
+        </label>
+        <label class="std-only">Speed (m/s)
+          <input type="number" id="speed2" value="40" min="0" step="1" inputmode="decimal">
+        </label>
+        <label class="std-only angle-label">
+          Angle (°)
+          <input type="number" id="angledeg2" value="180" min="-180" max="180" step="1" inputmode="decimal">
+        </label>
+        <label class="adv-only hidden">Vx (m/s)
+          <input type="number" id="vx2" value="40" step="1" inputmode="decimal">
+        </label>
+        <label class="adv-only hidden">Vy (m/s)
+          <input type="number" id="vy2" value="0" step="1" inputmode="decimal">
+        </label>
       </fieldset>
+
     </div>
-    <button id="start-btn" class="btn primary" data-i18n="start">Start Simulation</button>
+    <div class="panel-row">
+      <button id="adv-btn" class="btn small" data-i18n="adv_mode">⊞ Advanced</button>
+      <button id="start-btn" class="btn primary" data-i18n="start">Start Simulation</button>
+    </div>
   </div>
 
   <!-- Simulation panel: shown while simulation is running -->
