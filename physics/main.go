@@ -1,6 +1,8 @@
 package physics
 
 import (
+	"context"
+
 	"github.com/koljaPl/2-squares-collapse/physics/models"
 )
 
@@ -49,7 +51,7 @@ func Main() {
 
 	// ------------------------------------------------------------------------------------------------------
 	// For now, we will just run the simulation for a fixed amount of time and print the results to the console.
-	SimulationLoop(simulation, []models.Shape{square1, square2}, nil)
+	SimulationLoop(context.Background(), simulation, []models.Shape{square1, square2}, nil)
 
 	// -----------------------------------------------------------------------------------------------------
 	// It's important to use a channel for state updates if we want to visualize the simulation in real-time.

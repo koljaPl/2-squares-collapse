@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Physics — 2 Squares Collapse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <button id="theme-btn" title="Toggle theme">◐</button>
+  </div>
+  <a href="/" class="site-title">2 Squares Collapse</a>
+</header>
+
+<main>
+  <h1 class="page-title">Physics Derivations</h1>
+  <p class="page-desc">The mathematical foundations behind the collision simulation.</p>
+
+  <!-- ================================================================
+       PDF CARDS — edit title, description, and href for each PDF.
+       Place your PDF files in the frontend/ folder and update the href.
+       Add more cards by copying one <div class="pdf-card"> block.
+       ================================================================ -->
+  <div class="pdf-grid">
+
+    <div class="pdf-card">
+      <div class="pdf-num">01</div>
+      <h3>Elastic Collision Derivation</h3>
+      <p>1D elastic collision formulas with coefficient of restitution e.</p>
+      <!-- Replace the href with your actual PDF filename, e.g. href="part1.pdf" -->
+      <a href="physics-1.pdf" target="_blank" class="pdf-link">Open PDF →</a>
+    </div>
+
+    <div class="pdf-card">
+      <div class="pdf-num">02</div>
+      <h3>Event-Driven Simulation</h3>
+      <p>Time-to-collision calculations for object–object and object–wall events.</p>
+      <a href="physics-2.pdf" target="_blank" class="pdf-link">Open PDF →</a>
+    </div>
+
+    <div class="pdf-card">
+      <div class="pdf-num">03</div>
+      <h3>2D Extension</h3>
+      <p>Extending the model to two dimensions — normal vectors, impulse resolution.</p>
+      <a href="physics-3.pdf" target="_blank" class="pdf-link">Open PDF →</a>
+    </div>
+
+  </div>
+  <!-- ================================================================
+       END PDF CARDS
+       ================================================================ -->
+
+  <a href="/" class="text-link">← Back to Simulation</a>
+</main>
+
+<script>
+  // Theme — inherit from localStorage
+  const saved = localStorage.getItem('theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+  document.getElementById('theme-btn').addEventListener('click', () => {
+    const t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+    localStorage.setItem('theme', t);
+  });
+</script>
+</body>
+</html>
