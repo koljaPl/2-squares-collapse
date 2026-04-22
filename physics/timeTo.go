@@ -31,26 +31,31 @@ func TimeToObjectCollision(object1, object2 models.Shape) float64 {
 	base1 := object1.GetBase()
 	base2 := object2.GetBase()
 
-	dx := base2.Pos.X - base1.Pos.X
-	dvx := base1.Vel.X - base2.Vel.X
+	dP := base1.Pos.Sub(base2.Pos)
+	dV := base1.Vel.Sub(base2.Vel)
 
-	if dvx == 0 {
-		return math.Inf(1)
-	}
+	a := dV.Dot(dV)
+	b := 2 * dP.Dot(dV)
 
 	neededDist := neededDistance(object1, object2)
+	c := dP.Dot(dP) - neededDist*neededDist
 
-	gap := math.Abs(dx) - neededDist
-	if dx*dvx <= 0 {
+	if b >= 0 {
 		return math.Inf(1)
 	}
 
-	time := gap / math.Abs(dvx)
-	if time < EPS {
+	discriminant := b*b - 4*a*c
+	if discriminant < 0 {
 		return math.Inf(1)
 	}
 
-	return time
+	t := (-b - math.Sqrt(discriminant)) / (2 * a)
+
+	if t < EPS {
+		return math.Inf(1)
+	}
+
+	return t
 }
 
 func TimeToWallX(object models.Shape, wallCoordinates float64) float64 {
