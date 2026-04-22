@@ -346,6 +346,41 @@ label input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none
 .pdf-link:hover { border-color: var(--text); }
 
 /* ================================================================
+   SHAPE SELECTOR
+   ================================================================ */
+.shape-selector {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1rem;
+}
+
+.shape-btn {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  padding: 0.3rem 1rem;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: all 0.1s;
+}
+.shape-btn + .shape-btn { border-left: none; }
+.shape-btn.active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+.shape-btn:not(.active):hover { color: var(--text); border-color: var(--text); }
+
+.beta {
+  font-size: 0.6rem;
+  letter-spacing: 0;
+  opacity: 0.65;
+  vertical-align: super;
+}
+
+/* ================================================================
    RESPONSIVE
    ================================================================ */
 @media (max-width: 560px) {

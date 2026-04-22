@@ -35,11 +35,15 @@
 
   <!-- Setup panel: shown before simulation starts -->
   <div id="setup-panel" class="panel">
-    <p class="hint" data-i18n="hint">Drag squares to position · hover outside a square to set angle.</p>
+    <p class="hint" data-i18n="hint">Drag circles to position · hover outside to set angle.</p>
+    <div class="shape-selector">
+      <button class="shape-btn active" data-shape="circle">● Circle</button>
+      <button class="shape-btn" data-shape="square">■ Square <span class="beta">β</span></button>
+    </div>
     <div class="obj-inputs">
 
       <fieldset class="obj1-field">
-        <legend data-i18n="obj1">■ Object 1</legend>
+        <legend data-i18n="obj1">● Object 1</legend>
         <label><span data-i18n="mass">Mass</span> (kg)
           <input type="number" id="mass1" value="10" min="0.1" max="9999" step="1" inputmode="decimal">
         </label>
@@ -61,7 +65,7 @@
       </fieldset>
 
       <fieldset class="obj2-field">
-        <legend data-i18n="obj2">■ Object 2</legend>
+        <legend data-i18n="obj2">● Object 2</legend>
         <label><span data-i18n="mass">Mass</span> (kg)
           <input type="number" id="mass2" value="20" min="0.1" max="9999" step="1" inputmode="decimal">
         </label>

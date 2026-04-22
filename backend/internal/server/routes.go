@@ -109,10 +109,20 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	vx2, vy2 := additional_physics.PolarToCartesian(renderState.Angle2, renderState.RelativeSpeed2)
 
 	square1 := &models.Square{
-		BaseObject: models.BaseObject{X: renderState.X1, Y: renderState.Y1, Vx: vx1, Vy: vy1, Mass: renderState.Mass1, Density: 7850.0},
+		BaseObject: models.BaseObject{
+			Pos:     models.Vector2{X: renderState.X1, Y: renderState.Y1},
+			Vel:     models.Vector2{X: vx1, Y: vy1},
+			Mass:    renderState.Mass1,
+			Density: 7850.0,
+		},
 	}
 	square2 := &models.Square{
-		BaseObject: models.BaseObject{X: renderState.X2, Y: renderState.Y2, Vx: vx2, Vy: vy2, Mass: renderState.Mass2, Density: 7850.0},
+		BaseObject: models.BaseObject{
+			Pos:     models.Vector2{X: renderState.X2, Y: renderState.Y2},
+			Vel:     models.Vector2{X: vx2, Y: vy2},
+			Mass:    renderState.Mass2,
+			Density: 7850.0,
+		},
 	}
 	square1.SetupSize()
 	square2.SetupSize()
