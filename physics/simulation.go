@@ -14,9 +14,8 @@ const EPS = 1e-9
 func advance(objects []models.Shape, deltaTime float64) {
 	for i := range objects {
 		base := objects[i].GetBase()
-
-		base.X += base.Vx * deltaTime
-		base.Y += base.Vy * deltaTime
+		// Новая позиция = Старая позиция + (Скорость * Время)
+		base.Pos = base.Pos.Add(base.Vel.Mul(deltaTime))
 	}
 }
 
@@ -48,13 +47,30 @@ func findNextEvent(simulation models.Simulation, objects []models.Shape) (float6
 	var nextEvent *models.Event
 
 	wallsX := []float64{simulation.GetLeftWall(), simulation.GetRightWall()}
+	wallsY := []float64{simulation.GetBottomWall(), simulation.GetTopWall()}
+
 	for i, obj := range objects {
 		for _, wallCoord := range wallsX {
-			t := TimeToWall(obj, wallCoord)
+			t := TimeToWallX(obj, wallCoord)
 			if t > EPS && t < minTime {
 				minTime = t
 				nextEvent = &models.Event{
 					Type: "wall_x",
+					ObjA: i,
+					ObjB: -1,
+					Time: t,
+				}
+			}
+		}
+	}
+
+	for i, obj := range objects {
+		for _, wallCoord := range wallsY {
+			t := TimeToWallY(obj, wallCoord)
+			if t > EPS && t < minTime {
+				minTime = t
+				nextEvent = &models.Event{
+					Type: "wall_y",
 					ObjA: i,
 					ObjB: -1,
 					Time: t,
@@ -89,9 +105,10 @@ func processEvent(simulation models.Simulation, objects []models.Shape, event *m
 	switch event.Type {
 	case "wall_x", "wall":
 		base := objects[event.ObjA].GetBase()
-		ResolveWallCollision(base, simulation)
+		ResolveWallCollisionX(base)
 	case "wall_y":
-		// For future implementation when we will have walls in y direction, we will need to implement this case as well.
+		base := objects[event.ObjA].GetBase()
+		ResolveWallCollisionY(base)
 	case "object":
 		baseA := objects[event.ObjA].GetBase()
 		baseB := objects[event.ObjB].GetBase()
@@ -138,10 +155,10 @@ func simulateForever(ctx context.Context, simulation models.Simulation, objects 
 				base := obj.GetBase()
 				snapshot[i] = models.RenderState{
 					ID:   i,
-					X:    base.X,
-					Y:    base.Y,
-					Vx:   base.Vx,
-					Vy:   base.Vy,
+					X:    base.Pos.X,
+					Y:    base.Pos.Y,
+					Vx:   base.Vel.X,
+					Vy:   base.Vel.Y,
 					Size: obj.GetSize(),
 					// Можно добавить логику определения типа, если нужно для отрисовки
 					Type: "square",

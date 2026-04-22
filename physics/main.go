@@ -21,11 +21,8 @@ func Main() {
 
 	square1 := &models.Square{
 		BaseObject: models.BaseObject{
-			X: -300,
-			Y: 0,
-
-			Vx: 100,
-			Vy: 0,
+			Pos: models.Vector2{X: -300, Y: 0},
+			Vel: models.Vector2{X: 100, Y: 0},
 
 			Mass:    10,
 			Density: 7850.0,
@@ -35,11 +32,9 @@ func Main() {
 
 	square2 := &models.Square{
 		BaseObject: models.BaseObject{
-			X: 0,
-			Y: 0,
+			Pos: models.Vector2{X: 0, Y: 0},
+			Vel: models.Vector2{X: 40, Y: 0},
 
-			Vx:      40,
-			Vy:      0,
 			Mass:    20,
 			Density: 7850.0,
 		},

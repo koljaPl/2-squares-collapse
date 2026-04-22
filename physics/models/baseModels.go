@@ -11,8 +11,8 @@ type Simulation struct {
 }
 
 type BaseObject struct {
-	X, Y   float64
-	Vx, Vy float64
+	Pos Vector2
+	Vel Vector2
 
 	Mass    float64
 	Density float64
