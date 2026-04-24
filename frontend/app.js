@@ -3,6 +3,11 @@
 // ================================================================
 const WORLD = { w: 800, h: 600 };
 const DENSITY = 7850.0;
+
+// _dispPad is extra world-unit margin added around the physics arena on each side.
+// It is recomputed each render() from the actual masses so the visual radius of the
+// largest object always fits inside the canvas without overflowing the wall lines.
+let _dispPad = 60;
 const GITHUB_REPO = 'koljaPl/2-squares-collapse';
 
 // Visual scale: physics sizes are very small (fractions of a meter for steel).
@@ -130,12 +135,19 @@ let masses      = [10, 20];
 const canvas = document.getElementById('canvas');
 const ctx    = canvas.getContext('2d');
 
-// World (−400…+400 x, −300…+300 y) ↔ Canvas pixels
-const wx  = (worldX) => (worldX + WORLD.w / 2) / WORLD.w * canvasW;
-const wy  = (worldY) => (WORLD.h / 2 - worldY) / WORLD.h * canvasH;  // Y flipped
-const cw  = (cx)     => (cx / canvasW) * WORLD.w - WORLD.w / 2;
-const ch  = (cy)     => WORLD.h / 2 - (cy / canvasH) * WORLD.h;
-const wsc = (d)      => d / WORLD.w * canvasW;   // world distance → canvas px
+// World (−400…+400 x, −300…+300 y) ↔ Canvas pixels.
+// The displayed window is WORLD + _dispPad margin on each side so that the visual
+// radius of any object never overflows past the arena wall lines.
+// Because dispH/canvasH == dispW/canvasW (aspect ratio is preserved), wsc() is
+// uniform for both axes.
+const dispW = () => WORLD.w + 2 * _dispPad;
+const dispH = () => WORLD.h + 2 * _dispPad * (WORLD.h / WORLD.w); // keep 4:3 ratio
+
+const wx  = (worldX) => (worldX + dispW() / 2) / dispW() * canvasW;
+const wy  = (worldY) => (dispH() / 2 - worldY) / dispH() * canvasH;  // Y flipped
+const cw  = (cx)     => (cx / canvasW) * dispW() - dispW() / 2;
+const ch  = (cy)     => dispH() / 2 - (cy / canvasH) * dispH();
+const wsc = (d)      => d / dispW() * canvasW;   // world distance → canvas px
 
 const C = (k) => PALETTE[theme][k];
 

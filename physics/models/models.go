@@ -12,7 +12,7 @@ func (s *Square) SetupSize() {
 }
 
 func (s *Square) GetSize() float64 {
-	return s.Size
+	return s.Size / 2
 }
 
 func (s *Square) GetBase() *BaseObject {
