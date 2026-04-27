@@ -3,20 +3,27 @@
 // ================================================================
 const WORLD = { w: 800, h: 600 };
 const DENSITY = 7850.0;
-
-// _dispPad is extra world-unit margin added around the physics arena on each side.
-// It is recomputed each render() from the actual masses so the visual radius of the
-// largest object always fits inside the canvas without overflowing the wall lines.
-let _dispPad = 60;
 const GITHUB_REPO = 'koljaPl/2-squares-collapse';
 
-// Visual scale: physics sizes are very small (fractions of a meter for steel).
-// This multiplier makes them visible on screen.
-const SIZE_DISPLAY_SCALE = 1100;
+// Physics → visual scale.
+// Backend sends obj.size in SI meters (e.g. radius ≈ 0.02 m for a 10 kg steel ball).
+// We need to scale those tiny numbers to world-coordinate units (world is 800 units wide).
+// 3 800 → a 10 kg ball appears as ~5 % of arena width.  Feels right, not a dot.
+const SIZE_DISPLAY_SCALE = 3800;
 
-// Angle interaction ring (world units from the object's edge)
+// Minimum and maximum visual half-size in world units.
+// Prevents objects from being sub-pixel or filling the entire arena.
+const MIN_HALF  = 12;   // world units — no object rendered smaller than this
+const MAX_HALF  = 180;  // world units — no object rendered larger than this
+
+// Fixed arena padding from canvas edge, in CANVAS PIXELS.
+// The arena rect is always drawn with exactly this margin, so the border never
+// reaches the canvas edge and objects are cleanly clipped to it.
+const ARENA_PAD = 20;
+
+// Angle interaction ring (world units from the object's edge, in setup mode).
 const RING_INNER = 8;
-const RING_OUTER = 48;
+const RING_OUTER = 40;
 
 // ================================================================
 // TRANSLATIONS
@@ -80,26 +87,30 @@ const T = {
 // ================================================================
 const PALETTE = {
   light: {
-    bg:    '#FAFAF9',
-    grid:  'rgba(0,0,0,0.06)',
-    axis:  'rgba(0,0,0,0.18)',
-    label: '#78716C',
-    obj1:  '#1D4ED8',
-    obj2:  '#B91C1C',
-    ring1: 'rgba(29,78,216,0.12)',
-    ring2: 'rgba(185,28,28,0.12)',
-    text:  '#1C1917',
+    bg:      '#FAFAF9',
+    arena:   '#F0EFEB',
+    grid:    'rgba(0,0,0,0.06)',
+    axis:    'rgba(0,0,0,0.14)',
+    wall:    'rgba(0,0,0,0.40)',
+    label:   '#78716C',
+    obj1:    '#1D4ED8',
+    obj2:    '#B91C1C',
+    ring1:   'rgba(29,78,216,0.10)',
+    ring2:   'rgba(185,28,28,0.10)',
+    text:    '#1C1917',
   },
   dark: {
-    bg:    '#111008',
-    grid:  'rgba(255,255,255,0.05)',
-    axis:  'rgba(255,255,255,0.18)',
-    label: '#78716C',
-    obj1:  '#93C5FD',
-    obj2:  '#FCA5A5',
-    ring1: 'rgba(147,197,253,0.12)',
-    ring2: 'rgba(252,165,165,0.12)',
-    text:  '#E7E5E4',
+    bg:      '#111008',
+    arena:   '#0C0B07',
+    grid:    'rgba(255,255,255,0.05)',
+    axis:    'rgba(255,255,255,0.12)',
+    wall:    'rgba(255,255,255,0.40)',
+    label:   '#78716C',
+    obj1:    '#93C5FD',
+    obj2:    '#FCA5A5',
+    ring1:   'rgba(147,197,253,0.10)',
+    ring2:   'rgba(252,165,165,0.10)',
+    text:    '#E7E5E4',
   },
 };
 
@@ -114,19 +125,18 @@ let objectType  = 'circle';   // 'circle' | 'square'
 
 let ws          = null;
 let simObjects  = [];
-let prevVel     = [null, null];  // {vx, vy} for collision sound
+let prevVel     = [null, null];
 let canvasW = 1, canvasH = 1;
 
 let mouseWorld  = { x: 0, y: 0 };
-let drag        = null;  // { type: 'move'|'angle', idx: 0|1 } | null
-let hoverHit    = null;  // { idx, type: 'body'|'ring' } | null
+let drag        = null;   // { type: 'move'|'angle', idx: 0|1 } | null
+let hoverHit    = null;   // { idx, type: 'body'|'ring' } | null
 
 const setupObjs = [
-  { x: -260, y: 0 },
-  { x:  120, y: 0 },
+  { x: -200, y: 0 },
+  { x:  140, y: 0 },
 ];
-// angles in radians — standard math convention: 0 = right (+X), PI/2 = up (+Y)
-const objAngles = [0, Math.PI];
+const objAngles = [0, Math.PI]; // radians; 0 = right, π/2 = up
 let masses      = [10, 20];
 
 // ================================================================
@@ -135,34 +145,76 @@ let masses      = [10, 20];
 const canvas = document.getElementById('canvas');
 const ctx    = canvas.getContext('2d');
 
-// World (−400…+400 x, −300…+300 y) ↔ Canvas pixels.
-// The displayed window is WORLD + _dispPad margin on each side so that the visual
-// radius of any object never overflows past the arena wall lines.
-// Because dispH/canvasH == dispW/canvasW (aspect ratio is preserved), wsc() is
-// uniform for both axes.
-const dispW = () => WORLD.w + 2 * _dispPad;
-const dispH = () => WORLD.h + 2 * _dispPad * (WORLD.h / WORLD.w); // keep 4:3 ratio
-
-const wx  = (worldX) => (worldX + dispW() / 2) / dispW() * canvasW;
-const wy  = (worldY) => (dispH() / 2 - worldY) / dispH() * canvasH;  // Y flipped
-const cw  = (cx)     => (cx / canvasW) * dispW() - dispW() / 2;
-const ch  = (cy)     => dispH() / 2 - (cy / canvasH) * dispH();
-const wsc = (d)      => d / dispW() * canvasW;   // world distance → canvas px
-
 const C = (k) => PALETTE[theme][k];
 
-// ── Size helpers ──────────────────────────────────────────────────
-// Returns the "characteristic radius" used for hit-testing and ring placement.
-// Circle:  radius = sqrt(mass / (density * π))
-// Square:  half-side = sqrt(mass / density) / 2
-function displayHalf(mass, type) {
-  if (type === 'circle') return Math.sqrt(mass / (DENSITY * Math.PI)) * SIZE_DISPLAY_SCALE;
-  return Math.sqrt(mass / DENSITY) * SIZE_DISPLAY_SCALE / 2;
+// ================================================================
+// COORDINATE TRANSFORM
+// ================================================================
+// The arena occupies the canvas minus ARENA_PAD on every side.
+// Physics world: X ∈ [-400, 400], Y ∈ [-300, 300] (Y-up).
+// Canvas: Y is down, origin at top-left.
+//
+// These functions are the single source of truth for world ↔ canvas mapping.
+// There is no viewPad, no dynamic scale — the arena borders are always exactly
+// at pixel ARENA_PAD from the canvas edges, period.
+
+function arenaLeft()   { return ARENA_PAD; }
+function arenaTop()    { return ARENA_PAD; }
+function arenaRight()  { return canvasW - ARENA_PAD; }
+function arenaBottom() { return canvasH - ARENA_PAD; }
+function arenaW_px()   { return canvasW - 2 * ARENA_PAD; }
+function arenaH_px()   { return canvasH - 2 * ARENA_PAD; }
+
+// World → canvas pixel
+function wx(worldX) {
+  return ARENA_PAD + (worldX + WORLD.w / 2) / WORLD.w * arenaW_px();
+}
+function wy(worldY) {
+  return ARENA_PAD + (WORLD.h / 2 - worldY) / WORLD.h * arenaH_px(); // Y flipped
 }
 
-// Full side (square) or full diameter (circle) — for drawing
-function displayFull(mass, type) {
-  return displayHalf(mass, type) * (type === 'circle' ? 1 : 2);
+// Canvas pixel → world
+function cw(px) {
+  return (px - ARENA_PAD) / arenaW_px() * WORLD.w - WORLD.w / 2;
+}
+function ch(py) {
+  return WORLD.h / 2 - (py - ARENA_PAD) / arenaH_px() * WORLD.h;
+}
+
+// World distance → canvas pixels (uniform scale, using X axis)
+function wsc(d) { return d / WORLD.w * arenaW_px(); }
+
+// ================================================================
+// SIZE HELPERS
+// ================================================================
+//
+// "half" = the characteristic visual half-size used for rendering and hit-testing.
+//   circle → radius    square → half-side
+//
+// The backend sends obj.size in SI meters, which we scale up:
+//   displayHalf (setup, from mass):
+//     circle: radius = sqrt(m / (ρ·π))  · SCALE
+//     square: half   = sqrt(m / ρ) / 2  · SCALE
+//
+//   simHalf (running, from backend obj.size):
+//     Both circle and square: obj.size is already the "half" value in SI.
+//     Multiply by SCALE then clamp.
+
+function clampHalf(h) {
+  return Math.max(MIN_HALF, Math.min(MAX_HALF, h));
+}
+
+function displayHalf(mass, type) {
+  let raw;
+  if (type === 'circle') raw = Math.sqrt(mass / (DENSITY * Math.PI)) * SIZE_DISPLAY_SCALE;
+  else                   raw = Math.sqrt(mass / DENSITY) / 2 * SIZE_DISPLAY_SCALE;
+  return clampHalf(raw);
+}
+
+function simHalf(obj) {
+  // Теперь мы просто доверяем размеру от бекенда, 
+  // так как он уже применяет SIZE_DISPLAY_SCALE и ограничения
+  return obj.size;
 }
 
 // ================================================================
@@ -180,23 +232,55 @@ if (window.ResizeObserver) {
 window.addEventListener('resize', resize);
 
 // ================================================================
-// RENDER
+// RENDER  (main entry point)
 // ================================================================
 function render() {
   ctx.clearRect(0, 0, canvasW, canvasH);
+
+  // 1. Background (outer, behind arena)
   ctx.fillStyle = C('bg');
   ctx.fillRect(0, 0, canvasW, canvasH);
 
+  // 2. Arena fill
+  ctx.fillStyle = C('arena');
+  ctx.fillRect(arenaLeft(), arenaTop(), arenaW_px(), arenaH_px());
+
+  // 3. Grid lines (inside arena, drawn before clipping)
   drawGrid();
 
+  // 4. Arena border on top of grid
+  drawArenaBorder();
+
+  // 5. Clip everything that follows to the arena rectangle.
+  //    This prevents objects from visually overflowing the walls,
+  //    regardless of what the physics says.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(arenaLeft(), arenaTop(), arenaW_px(), arenaH_px());
+  ctx.clip();
+
+  // 6. Draw content
   if (phase === 'setup') {
     drawSetup();
   } else {
+    // Draw velocity arrows FIRST (behind objects)
     simObjects.forEach((obj, i) => {
       const color = i === 0 ? C('obj1') : C('obj2');
-      drawArrow(obj, obj.vx, obj.vy, color);
-      drawShape(obj, obj.size * SIZE_DISPLAY_SCALE, obj.type, color);
+      drawArrow(obj, obj.vx, obj.vy, color, simHalf(obj));
     });
+    // Then draw object bodies ON TOP of arrows
+    simObjects.forEach((obj, i) => {
+      const color = i === 0 ? C('obj1') : C('obj2');
+      drawShape(obj, simHalf(obj), obj.type, color);
+    });
+  }
+
+  // 7. Remove clip
+  ctx.restore();
+
+  // 8. Overlay: coordinate labels when dragging (outside clip so they can float)
+  if (drag !== null || hoverHit !== null) {
+    drawCoordLabel();
   }
 }
 
@@ -204,60 +288,65 @@ function render() {
 // GRID
 // ================================================================
 function drawGrid() {
-  const showLabels = drag !== null || hoverHit !== null;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(arenaLeft(), arenaTop(), arenaW_px(), arenaH_px());
+  ctx.clip();
 
+  // Minor grid
   ctx.lineWidth   = 0.5;
   ctx.strokeStyle = C('grid');
   for (let x = -400; x <= 400; x += 100) {
-    ctx.beginPath(); ctx.moveTo(wx(x), 0); ctx.lineTo(wx(x), canvasH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(wx(x), arenaTop()); ctx.lineTo(wx(x), arenaBottom()); ctx.stroke();
   }
   for (let y = -300; y <= 300; y += 100) {
-    ctx.beginPath(); ctx.moveTo(0, wy(y)); ctx.lineTo(canvasW, wy(y)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(arenaLeft(), wy(y)); ctx.lineTo(arenaRight(), wy(y)); ctx.stroke();
   }
 
-  // Axes
+  // Center axes
   ctx.strokeStyle = C('axis');
   ctx.lineWidth   = 1;
-  ctx.beginPath(); ctx.moveTo(wx(0), 0);     ctx.lineTo(wx(0), canvasH); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0, wy(0));     ctx.lineTo(canvasW, wy(0)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(wx(0), arenaTop());    ctx.lineTo(wx(0), arenaBottom()); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(arenaLeft(), wy(0));   ctx.lineTo(arenaRight(), wy(0));  ctx.stroke();
 
-  if (!showLabels) return;
+  ctx.restore();
+}
 
+function drawArenaBorder() {
+  ctx.strokeStyle = C('wall');
+  ctx.lineWidth   = 1.5;
+  ctx.strokeRect(arenaLeft(), arenaTop(), arenaW_px(), arenaH_px());
+}
+
+function drawCoordLabel() {
   const fs = Math.max(9, canvasW * 0.012);
   ctx.font      = `${fs}px 'JetBrains Mono', monospace`;
-  ctx.fillStyle = C('label');
-
-  ctx.textAlign = 'center';
-  for (let x = -300; x <= 300; x += 100) {
-    if (x === 0) continue;
-    ctx.fillText(x, wx(x), wy(0) + fs + 2);
-  }
-  ctx.textAlign = 'right';
-  for (let y = -200; y <= 200; y += 100) {
-    if (y === 0) continue;
-    ctx.fillText(y, wx(0) - 4, wy(y) + 4);
-  }
-
-  // Live cursor world coords
-  ctx.font      = `bold ${fs}px 'JetBrains Mono', monospace`;
   ctx.fillStyle = C('text');
   ctx.textAlign = 'left';
-  ctx.fillText(`(${Math.round(mouseWorld.x)}, ${Math.round(mouseWorld.y)})`, 8, fs + 4);
+  ctx.fillText(`(${Math.round(mouseWorld.x)}, ${Math.round(mouseWorld.y)})`, arenaLeft() + 6, arenaTop() + fs + 4);
 }
 
 // ================================================================
 // SETUP DRAWING
 // ================================================================
 function drawSetup() {
+  // Draw arrows first, then bodies — same z-order convention as running mode.
+  for (let i = 0; i < 2; i++) {
+    const color = i === 0 ? C('obj1') : C('obj2');
+    const { vx, vy } = getVelocity(i);
+    const half = displayHalf(masses[i], objectType);
+    drawArrow(setupObjs[i], vx, vy, color, half);
+  }
+
   for (let i = 0; i < 2; i++) {
     const obj   = setupObjs[i];
     const color = i === 0 ? C('obj1') : C('obj2');
     const ringC = i === 0 ? C('ring1') : C('ring2');
     const half  = displayHalf(masses[i], objectType);
 
-    // ── Angle ring ──
+    // Angle ring (shown when hovering or dragging the ring zone)
     const showRing = (hoverHit?.idx === i && hoverHit.type === 'ring')
-                  || (drag?.idx === i && drag.type === 'angle');
+                  || (drag?.idx    === i && drag.type    === 'angle');
     if (showRing) {
       const rInner = wsc(half + RING_INNER);
       const rOuter = wsc(half + RING_INNER + RING_OUTER);
@@ -269,90 +358,106 @@ function drawSetup() {
       ctx.fillStyle = ringC;
       ctx.fill();
 
+      ctx.save();
       ctx.setLineDash([4, 4]);
       ctx.strokeStyle = color;
       ctx.lineWidth   = 1;
-      ctx.globalAlpha = 0.45;
+      ctx.globalAlpha = 0.4;
       ctx.beginPath(); ctx.arc(cx_, cy_, rOuter, 0, Math.PI * 2); ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.setLineDash([]);
+      ctx.restore();
     }
 
-    // ── Velocity arrow ──
-    const { vx, vy } = getVelocity(i);
-    drawArrow(obj, vx, vy, color);
-
-    // ── Object body ──
-    drawShape(obj, displayFull(masses[i], objectType), objectType, color);
+    drawShape(obj, half, objectType, color);
   }
 }
 
 // ================================================================
 // SHAPE PRIMITIVES
 // ================================================================
-// `obj`      — {x, y} in world coords
-// `sizeWorld`— radius (circle) or full side (square), in world units
-// `type`     — 'circle' | 'square'
-function drawShape(obj, sizeWorld, type, color) {
-  if (type === 'circle') {
-    drawCircle(obj, sizeWorld, color);
-  } else {
-    drawSquare(obj, sizeWorld, color);
-  }
+// drawShape dispatches based on type.
+// half: the characteristic half-size in world units
+//   circle → radius   square → half-side
+
+function drawShape(obj, half, type, color) {
+  if (type === 'circle') drawCircle(obj, half, color);
+  else                   drawSquare(obj, half, color);
 }
 
-function drawCircle(obj, radiusWorld, color) {
-  const r = wsc(radiusWorld);
+function drawCircle(obj, half, color) {
+  const r = wsc(half);
   const x = wx(obj.x), y = wy(obj.y);
-  ctx.globalAlpha = 0.15;
+
+  // Semi-transparent fill
+  ctx.globalAlpha = 0.18;
   ctx.fillStyle   = color;
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   ctx.globalAlpha = 1;
+
+  // Outline
   ctx.strokeStyle = color;
-  ctx.lineWidth   = 1.5;
+  ctx.lineWidth   = 2;
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+
+  // Center dot
   ctx.fillStyle = color;
-  ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, Math.max(2.5, r * 0.06), 0, Math.PI * 2); ctx.fill();
 }
 
-function drawSquare(obj, sideWorld, color) {
-  const s = wsc(sideWorld);
+function drawSquare(obj, half, color) {
+  const s = wsc(half);      // half → canvas pixels (half-side)
   const x = wx(obj.x), y = wy(obj.y);
-  ctx.globalAlpha = 0.15;
+
+  // Semi-transparent fill
+  ctx.globalAlpha = 0.18;
   ctx.fillStyle   = color;
-  ctx.fillRect(x - s / 2, y - s / 2, s, s);
+  ctx.fillRect(x - s, y - s, s * 2, s * 2);
   ctx.globalAlpha = 1;
+
+  // Outline
   ctx.strokeStyle = color;
-  ctx.lineWidth   = 1.5;
-  ctx.strokeRect(x - s / 2, y - s / 2, s, s);
+  ctx.lineWidth   = 2;
+  ctx.strokeRect(x - s, y - s, s * 2, s * 2);
+
+  // Center dot
   ctx.fillStyle = color;
-  ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, Math.max(2.5, s * 0.06), 0, Math.PI * 2); ctx.fill();
 }
 
 // ================================================================
 // VELOCITY ARROW
 // ================================================================
-function drawArrow(obj, vx, vy, color) {
+function drawArrow(obj, vx, vy, color, objHalf) {
   const speed = Math.sqrt(vx * vx + vy * vy);
-  if (speed < 0.5) return;
-  const worldLen = Math.min(80, speed * 0.3);
-  const scale    = worldLen / speed;
-  const sx = wx(obj.x),             sy = wy(obj.y);
-  const ex = wx(obj.x + vx * scale), ey = wy(obj.y + vy * scale); // wy handles Y-flip
-  const ang = Math.atan2(ey - sy, ex - sx);
-  const hs  = Math.max(6, wsc(8));
+  if (speed < 0.1) return;
 
+  // Arrow length: scale with speed but cap it so it doesn't dominate the arena.
+  // Start the arrow from the object's edge, not its center, so it's clearly separate.
+  const worldLen = Math.min(90, speed * 0.25);
+  const scale    = worldLen / speed;
+
+  // Start point: object center
+  const sx = wx(obj.x),                        sy = wy(obj.y);
+  // End point: center + velocity vector (wy handles Y-flip)
+  const ex = wx(obj.x + vx * scale),           ey = wy(obj.y + vy * scale);
+  const ang = Math.atan2(ey - sy, ex - sx);
+  const hs  = Math.max(6, wsc(10));   // arrowhead size in canvas px
+
+  ctx.save();
   ctx.strokeStyle = color;
+  ctx.fillStyle   = color;
+  ctx.globalAlpha = 0.75;
   ctx.lineWidth   = 1.5;
+
   ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
 
-  ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(ex, ey);
   ctx.lineTo(ex - hs * Math.cos(ang - 0.4), ey - hs * Math.sin(ang - 0.4));
   ctx.lineTo(ex - hs * Math.cos(ang + 0.4), ey - hs * Math.sin(ang + 0.4));
   ctx.closePath();
   ctx.fill();
+
+  ctx.restore();
 }
 
 // ================================================================
@@ -384,16 +489,17 @@ function syncAngleInput(i) {
 }
 
 // ================================================================
-// HIT TEST (AABB — good enough for UI interaction)
+// HIT TEST  (AABB — good enough for UI interaction)
 // ================================================================
 function hitTest(canvasX, canvasY) {
   const wx_ = cw(canvasX), wy_ = ch(canvasY);
+  // Check in reverse order so the topmost-drawn object wins
   for (let i = setupObjs.length - 1; i >= 0; i--) {
     const half     = displayHalf(masses[i], objectType);
     const ringEdge = half + RING_INNER + RING_OUTER;
     const dx = Math.abs(wx_ - setupObjs[i].x);
     const dy = Math.abs(wy_ - setupObjs[i].y);
-    if (dx <= half && dy <= half)         return { idx: i, type: 'body' };
+    if (dx <= half     && dy <= half)     return { idx: i, type: 'body' };
     if (dx <= ringEdge && dy <= ringEdge) return { idx: i, type: 'ring' };
   }
   return null;
@@ -405,26 +511,23 @@ function hitTest(canvasX, canvasY) {
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
 function safePos(idx, newX, newY) {
-  const half      = displayHalf(masses[idx], objectType);
+  const half      = displayHalf(masses[idx],     objectType);
   const otherHalf = displayHalf(masses[1 - idx], objectType);
   const other     = setupObjs[1 - idx];
-  const minSep    = half + otherHalf;  // min center-to-center distance
+  const minSep    = half + otherHalf;
 
-  // Clamp to world bounds
+  // Clamp to physics world bounds (object edge must stay inside the walls)
   newX = clamp(newX, -WORLD.w / 2 + half, WORLD.w / 2 - half);
   newY = clamp(newY, -WORLD.h / 2 + half, WORLD.h / 2 - half);
 
-  // AABB overlap push
+  // AABB overlap push-apart
   const dx = newX - other.x;
   const dy = newY - other.y;
   if (Math.abs(dx) < minSep && Math.abs(dy) < minSep) {
     const penX = minSep - Math.abs(dx);
     const penY = minSep - Math.abs(dy);
-    if (penX <= penY) {
-      newX = other.x + Math.sign(dx || 1) * minSep;
-    } else {
-      newY = other.y + Math.sign(dy || 1) * minSep;
-    }
+    if (penX <= penY) newX = other.x + Math.sign(dx || 1) * minSep;
+    else              newY = other.y + Math.sign(dy || 1) * minSep;
     newX = clamp(newX, -WORLD.w / 2 + half, WORLD.w / 2 - half);
     newY = clamp(newY, -WORLD.h / 2 + half, WORLD.h / 2 - half);
   }
@@ -445,7 +548,8 @@ function getCanvasXY(e) {
 
 function onPointerDown(e) {
   if (phase !== 'setup') return;
-  const hit = hitTest(...Object.values(getCanvasXY(e)));
+  const p   = getCanvasXY(e);
+  const hit = hitTest(p.x, p.y);
   if (!hit) return;
   drag = { type: hit.type, idx: hit.idx };
   canvas.style.cursor = hit.type === 'body' ? 'grabbing' : 'crosshair';
@@ -463,7 +567,6 @@ function onPointerMove(e) {
         setupObjs[idx].x = pos.x;
         setupObjs[idx].y = pos.y;
       } else {
-        // Angle: atan2 in world space (Y is up)
         const obj = setupObjs[idx];
         objAngles[idx] = Math.atan2(ch(p.y) - obj.y, cw(p.x) - obj.x);
         syncAngleInput(idx);
@@ -505,7 +608,6 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     objectType = btn.dataset.shape;
     document.querySelectorAll('.shape-btn').forEach(b => b.classList.toggle('active', b === btn));
-    // Update legend icons and hint
     const isCircle = objectType === 'circle';
     document.querySelector('[data-i18n="obj1"]').textContent = T[lang][isCircle ? 'obj1' : 'obj1_sq'];
     document.querySelector('[data-i18n="obj2"]').textContent = T[lang][isCircle ? 'obj2' : 'obj2_sq'];
@@ -523,7 +625,6 @@ document.getElementById('adv-btn').addEventListener('click', () => {
   document.querySelectorAll('.std-only').forEach(el => el.classList.toggle('hidden', advMode));
   document.querySelectorAll('.adv-only').forEach(el => el.classList.toggle('hidden', !advMode));
   if (!advMode) {
-    // Sync angle/speed from vx/vy when returning to standard mode
     for (let i = 0; i < 2; i++) {
       const { angle } = getSpeedAngle(i);
       objAngles[i] = angle;
@@ -593,12 +694,12 @@ function setStatus(msg) { document.getElementById('status-line').textContent = m
 // ================================================================
 // COLLISION SOUND
 // ================================================================
-let audioCtx       = null;
-let lastSoundTime  = 0;
+let audioCtx      = null;
+let lastSoundTime = 0;
 
 function playCollisionSound() {
   const now = Date.now();
-  if (now - lastSoundTime < 80) return;  // debounce: max one sound per 80ms
+  if (now - lastSoundTime < 80) return;
   lastSoundTime = now;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -613,16 +714,13 @@ function playCollisionSound() {
   } catch (_) {}
 }
 
-// Detect collision by checking if the velocity vector changed direction significantly.
-// Works for both 1D (Vx sign flip) and 2D (dot product of old/new velocity < 0).
 function detectCollisions(objects) {
   objects.forEach((obj, i) => {
     const prev = prevVel[i];
     if (prev) {
-      const dot = obj.vx * prev.vx + obj.vy * prev.vy;
+      const dot       = obj.vx * prev.vx + obj.vy * prev.vy;
       const prevSpeed = Math.sqrt(prev.vx ** 2 + prev.vy ** 2);
-      const currSpeed = Math.sqrt(obj.vx ** 2 + obj.vy ** 2);
-      // Fire sound if velocity direction changed (dot product < 0) or speed changed > 5%
+      const currSpeed = Math.sqrt(obj.vx  ** 2 + obj.vy  ** 2);
       if (prevSpeed > 0.5 && currSpeed > 0.5 && dot < prevSpeed * currSpeed * 0.8) {
         playCollisionSound();
       }
@@ -644,7 +742,6 @@ function setLang(l) {
   document.documentElement.lang = l;
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.dataset.i18n;
-    // hint is shape-sensitive
     if (key === 'hint') {
       el.textContent = T[l][objectType === 'circle' ? 'hint_circle' : 'hint_square'];
     } else if (T[l][key]) {
@@ -681,12 +778,12 @@ function numVal(id) { return parseFloat(document.getElementById(id)?.value) || 0
 // ================================================================
 // INIT
 // ================================================================
+resize();
 applyTheme(theme);
 setLang(lang);
 fetchStars();
 syncAngleInput(0);
 syncAngleInput(1);
-resize();
 
 document.getElementById('start-btn').addEventListener('click', startSimulation);
 document.getElementById('reset-btn').addEventListener('click', resetSimulation);
