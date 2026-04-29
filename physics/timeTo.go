@@ -17,7 +17,7 @@ func relativeVelocity(object1, object2 models.Shape) float64 {
 }
 
 func neededDistance(object1, object2 models.Shape) float64 {
-	return (object1.GetSize() + object2.GetSize()) / 2
+	return object1.GetSize() + object2.GetSize()
 }
 
 func currentDistance(object1, object2 models.Shape) float64 {
@@ -69,9 +69,9 @@ func TimeToWallX(object models.Shape, wallCoordinates float64) float64 {
 
 	// Учитываем размер объекта (край, а не центр ударяется о стену)
 	if base.Vel.X > 0 {
-		dist -= object.GetSize() / 2
+		dist -= object.GetSize()
 	} else {
-		dist += object.GetSize() / 2
+		dist += object.GetSize()
 	}
 
 	time := dist / base.Vel.X
@@ -92,9 +92,9 @@ func TimeToWallY(object models.Shape, wallCoordinates float64) float64 {
 
 	// Учитываем размер объекта (край, а не центр ударяется о стену)
 	if base.Vel.Y > 0 {
-		dist -= object.GetSize() / 2
+		dist -= object.GetSize()
 	} else {
-		dist += object.GetSize() / 2
+		dist += object.GetSize()
 	}
 
 	time := dist / base.Vel.Y

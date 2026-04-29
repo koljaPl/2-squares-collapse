@@ -153,6 +153,10 @@ func simulateForever(ctx context.Context, simulation models.Simulation, objects 
 			snapshot := make([]models.RenderState, len(objects))
 			for i, obj := range objects {
 				base := obj.GetBase()
+				objType := "circle"
+				if _, ok := obj.(*models.Square); ok {
+					objType = "square"
+				}
 				snapshot[i] = models.RenderState{
 					ID:   i,
 					X:    base.Pos.X,
@@ -160,8 +164,7 @@ func simulateForever(ctx context.Context, simulation models.Simulation, objects 
 					Vx:   base.Vel.X,
 					Vy:   base.Vel.Y,
 					Size: obj.GetSize(),
-					// Можно добавить логику определения типа, если нужно для отрисовки
-					Type: "square",
+					Type: objType,
 				}
 			}
 

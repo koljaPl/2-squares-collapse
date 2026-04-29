@@ -1,0 +1,12 @@
+# Railway config for the BACKEND service.
+# In Railway dashboard: set "Root Directory" to /  and "Dockerfile Path" to backend/Dockerfile
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "backend/Dockerfile"
+
+[deploy]
+# Railway sets PORT automatically. The backend already reads it via os.Getenv("PORT").
+# No extra env vars needed for the backend.
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

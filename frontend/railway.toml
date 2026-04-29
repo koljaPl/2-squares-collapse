@@ -1,0 +1,14 @@
+# Railway config for the FRONTEND service.
+# In Railway dashboard: set "Root Directory" to /  and "Dockerfile Path" to frontend/Dockerfile
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "frontend/Dockerfile"
+
+[deploy]
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# BACKEND_HOST is set in Railway dashboard → Frontend service → Variables:
+#   BACKEND_HOST = ${{backend.RAILWAY_PRIVATE_DOMAIN}}:${{backend.PORT}}
+# Replace "backend" with whatever you named the backend service in Railway.

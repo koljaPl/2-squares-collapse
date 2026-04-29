@@ -66,6 +66,9 @@ type RenderState struct {
 
 	Mass1 float64 `json:"mass1"`
 	Mass2 float64 `json:"mass2"`
+
+	// "circle" (default) or "square"
+	ObjectType string `json:"object_type"`
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
@@ -108,15 +111,35 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	vx1, vy1 := additional_physics.PolarToCartesian(renderState.Angle1, renderState.RelativeSpeed1)
 	vx2, vy2 := additional_physics.PolarToCartesian(renderState.Angle2, renderState.RelativeSpeed2)
 
-	square1 := &models.Square{
-		BaseObject: models.BaseObject{X: renderState.X1, Y: renderState.Y1, Vx: vx1, Vy: vy1, Mass: renderState.Mass1, Density: 7850.0},
+	base1 := models.BaseObject{
+		Pos:     models.Vector2{X: renderState.X1, Y: renderState.Y1},
+		Vel:     models.Vector2{X: vx1, Y: vy1},
+		Mass:    renderState.Mass1,
+		Density: 7850.0,
 	}
-	square2 := &models.Square{
-		BaseObject: models.BaseObject{X: renderState.X2, Y: renderState.Y2, Vx: vx2, Vy: vy2, Mass: renderState.Mass2, Density: 7850.0},
+	base2 := models.BaseObject{
+		Pos:     models.Vector2{X: renderState.X2, Y: renderState.Y2},
+		Vel:     models.Vector2{X: vx2, Y: vy2},
+		Mass:    renderState.Mass2,
+		Density: 7850.0,
 	}
-	square1.SetupSize()
-	square2.SetupSize()
-	objects := []models.Shape{square1, square2}
+
+	var obj1, obj2 models.Shape
+	if renderState.ObjectType == "square" {
+		s1 := &models.Square{BaseObject: base1}
+		s1.SetupSize()
+		s2 := &models.Square{BaseObject: base2}
+		s2.SetupSize()
+		obj1, obj2 = s1, s2
+	} else {
+		// Default: circle
+		c1 := &models.Circle{BaseObject: base1}
+		c1.SetupSize()
+		c2 := &models.Circle{BaseObject: base2}
+		c2.SetupSize()
+		obj1, obj2 = c1, c2
+	}
+	objects := []models.Shape{obj1, obj2}
 
 	stateChan := make(chan []models.RenderState, 1)
 
