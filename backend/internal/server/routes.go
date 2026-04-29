@@ -22,6 +22,11 @@ func (s *Server) RegisterRoutes() http.Handler {
 	// fileServer := http.FileServer(http.Dir("./static"))
 	// mux.Handle("/", fileServer)
 
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
 	return s.corsMiddleware(mux)
 }
 
